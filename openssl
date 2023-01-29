@@ -1,0 +1,97 @@
+on root ca machine
+
+pwd
+mkdir ca
+cd ca
+mkdir -p certs crl newcerts private subca/csr subca/certs
+chmod 700 private/
+touch index.txt
+touch index.txt.attr
+echo 1000>serial
+echo 1000>crlnumber
+wget http://-----------------||---------------------/rootca.cnf
+nano rootca.cnf
+/home/shuhari/ca
+
+openssl genrsa -aes256 -out private/ca.key.pem 4096
+chmod 400 private/ca.key.pem
+
+openssl req -config rootca.cnf -key private/ca.key.pem -new -x509 -days 7300 -sha256 -extensions v3_ca -out certs/ca.cert.pem
+fill info 
+chmod 444 certs/ca.cert.pem
+
+
+
+go to subca machine
+
+
+
+mkdir subca
+cd subca
+mkdir certs crl csr newcerts private
+chmod 700 private
+
+touch index.txt
+touch index.txt.attr
+echo 1000>serial
+echo 1000>crlnumber
+wget http://-------------------------||-----------------------------/subca.cnf
+openssl genrsa -aes256 -out private/subca.key.pem 4096
+chmod 400 private/subca.key.pem
+nano subca.cnf
+     /home/shuhari/ca
+openssl req -config subca.cnf -new -sha256 -key private/subca.key.pem -out csr/subca.csr.pem
+fill details
+scp -r subca.csr.pem shuhari@192.168.80.101:/home/shuhari/ca/subca/csr/
+
+
+
+go to rootca machine
+
+
+openssl ca -config rootca.cnf -extensions v3_intermediate_ca -days 3650 -notext -md sha256 -in subca/csr/subca.csr.pem -out subca/certs/subca.cert.pem
+md5sum newcerts/1000.pem subca/certs/subca.cert.pem
+chmod 444 subca/certs/subca.cert.pem
+cat subca/certs/subca.certs.pem certs/ca.cert.pem > subca/certs/ca-chain.cert.pem
+scp -r subca/certs/ca-chain.cert.pem subca/certs/subca.cert.pem shuhari@192.168.80.102:/home/shuhari/subca/certs
+
+
+
+
+goto ser1 machine
+
+
+
+mkdir certs
+cd certs
+wget http://----------------------||-------------------------/subca.cnf
+openssl genrsa -out www.shuhari.local.key.pem 2048
+chmod 400 www.shuhari.local.key.pem
+openssl req -config subca.cnf -key www.shuhari.local.key.pem -new -sha256 -out www.shuhari.local.csr.pem
+fill the details
+
+scp -r www.shuhari.local.csr.pem shuhari@192.168.80.103:/home/shuhari/subca/csr/
+
+
+
+go to subca machine
+
+
+
+cd subca
+openssl ca -config subca.cnf -extensions server_cert -days 375 -notext -md sha256 -in csr/www.shuhari.local.csr.pem -out certs/www.shuhari.local.cert.pem
+scp -r certs/www.shuhari.local.cert.pem certs/ca-chain.cert.pem shuhari@192.168.80.103:/home/shuhari/certs/
+sudo apt-get install apache2 openssl
+openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -nodes -out mycert.crt -keyout mykey.key
+sudo mkdir /etc/apache2/ssl
+sudo mv mycert.crt mykey.key /etc/apache2/ssl/
+sudo chmod 600 /etc/apache2/ssl/*
+sudo a2enmod ssl
+sudo a2ensite default-ssl
+sudo nano /etc/apache2/sites-enable/default-ssl.conf
+         ServerName 192.168.80.103:443
+         sslcertificatefile /etc/apache2/ssl/www.shuhari.local.cert.pem
+         sslcertificatekeyfile /etc/apache2/ssl/www.shuhari.local.key.pem
+         
+sudo systemctl restart apache2
+
